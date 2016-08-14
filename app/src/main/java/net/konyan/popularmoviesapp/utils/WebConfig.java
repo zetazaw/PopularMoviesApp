@@ -35,7 +35,7 @@ public class WebConfig {
     private static final String QUERY_VIDEO = "v";
     private static final String QUERY_API = "api_key";
     //TODO: change api key here!
-    private static final String KEY_API = "44932de373ddb6cfa053f74c1947dd99";
+    private static final String KEY_API = "Your API Key";
 
     public static final String PATH_POPULAR = "popular";
     public static final String PATH_TOP_RATED = "top_rated";
