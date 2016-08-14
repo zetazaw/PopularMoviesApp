@@ -1,63 +1,67 @@
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
+    android:layout_height="wrap_content"
     tools:context="net.konyan.popularmoviesapp.fragment.DetailFragment">
 
-    <RelativeLayout
+    <TextView
+        android:id="@+id/tv_detail_movie_title"
+        style="@style/TextAppearance.AppCompat.Display1"
         android:layout_width="match_parent"
-        android:layout_height="match_parent">
+        android:layout_height="wrap_content"
+        android:layout_alignParentTop="true"
+        android:background="@color/colorAccent"
+        android:padding="@dimen/activity_horizontal_margin"
+        tools:text="Title" />
+
+    <TextView
+        android:id="@+id/tv_detail_movie_release_date"
+        style="@style/TextAppearance.AppCompat.Display1"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/tv_detail_movie_title"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="@dimen/activity_vertical_margin"
+        tools:text="2015" />
+
+    <TextView
+        android:id="@+id/tv_detail_movie_rating"
+        style="@style/TextAppearance.AppCompat.Body1"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignLeft="@id/tv_detail_movie_release_date"
+        android:layout_below="@id/tv_detail_movie_release_date"
+        tools:text="5.5/10" />
 
 
-        <TextView
-            android:id="@+id/tv_detail_movie_title"
-            style="@style/TextAppearance.AppCompat.Display1"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_alignParentTop="true"
-            android:background="@color/colorAccent"
-            android:padding="@dimen/activity_horizontal_margin"
-            tools:text="Title" />
+    <ImageView
+        android:id="@+id/iv_detail_movie_poster"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/tv_detail_movie_title"
+        android:layout_margin="@dimen/activity_vertical_margin"
+        android:layout_toLeftOf="@id/tv_detail_movie_release_date"
+        android:adjustViewBounds="true"
+        tools:src="@drawable/cold_drink" />
 
-        <TextView
-            android:id="@+id/tv_detail_movie_release_date"
-            style="@style/TextAppearance.AppCompat.Display1"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_below="@id/tv_detail_movie_title"
-            android:layout_centerHorizontal="true"
-            android:layout_marginTop="@dimen/activity_vertical_margin"
-            tools:text="2015" />
-
-        <TextView
-            android:id="@+id/tv_detail_movie_rating"
-            style="@style/TextAppearance.AppCompat.Body1"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_alignLeft="@id/tv_detail_movie_release_date"
-            android:layout_below="@id/tv_detail_movie_release_date"
-            tools:text="5.5/10" />
+    <Button
+        android:id="@+id/bt_detail_movie_favorite"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/tv_detail_movie_release_date"
+        android:layout_alignLeft="@id/tv_detail_movie_release_date"
+        android:layout_marginTop="@dimen/activity_vertical_margin"
+        android:text="Add to Favorite"/>
 
 
-        <ImageView
-            android:id="@+id/iv_detail_movie_poster"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_below="@id/tv_detail_movie_title"
-            android:layout_margin="@dimen/activity_vertical_margin"
-            android:layout_toLeftOf="@id/tv_detail_movie_release_date"
-            android:adjustViewBounds="true"
-            tools:src="@drawable/cold_drink" />
+    <TextView
+        android:id="@+id/tv_detail_movie_plot"
+        style="@style/TextAppearance.AppCompat.Caption"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/iv_detail_movie_poster"
+        android:padding="@dimen/activity_vertical_margin"
+        tools:text="Plot ......................." />
 
 
-        <TextView
-            android:id="@+id/tv_detail_movie_plot"
-            style="@style/TextAppearance.AppCompat.Caption"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_below="@id/iv_detail_movie_poster"
-            android:padding="@dimen/activity_vertical_margin"
-            tools:text="Plot ......................." />
-
-    </RelativeLayout>
-</ScrollView>
+</RelativeLayout>

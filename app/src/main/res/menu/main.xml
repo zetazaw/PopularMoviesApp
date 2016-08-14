@@ -12,6 +12,9 @@
             <item
                 android:id="@+id/action_top_rated"
                 android:title="@string/top_rated" />
+            <item
+                android:id="@+id/action_my_favorite"
+                android:title="@string/my_fav" />
         </menu>
     </item>
 

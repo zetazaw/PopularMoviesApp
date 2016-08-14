@@ -10,8 +10,8 @@
         android:layout_height="wrap_content"
         android:layout_gravity="center"/>
 
-    <GridView
-        android:id="@+id/grid_movie_posters"
+    <android.support.v7.widget.RecyclerView
+        android:id="@+id/rv_movie_posters"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:numColumns="2"

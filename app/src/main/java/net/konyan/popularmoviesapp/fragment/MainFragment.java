@@ -1,9 +1,21 @@
 package net.konyan.popularmoviesapp.fragment;
 
+import android.content.ContentProviderOperation;
+import android.content.ContentValues;
+import android.content.Context;
 import android.content.Intent;
-import android.os.AsyncTask;
+import android.content.OperationApplicationException;
+import android.database.Cursor;
+import android.net.Uri;
 import android.os.Bundle;
+import android.os.RemoteException;
+import android.support.annotation.Nullable;
 import android.support.v4.app.Fragment;
+import android.support.v4.app.LoaderManager;
+import android.support.v4.content.CursorLoader;
+import android.support.v4.content.Loader;
+import android.support.v7.widget.GridLayoutManager;
+import android.support.v7.widget.RecyclerView;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
@@ -11,35 +23,34 @@ import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.AdapterView;
-import android.widget.GridView;
 import android.widget.ProgressBar;
 
-import net.konyan.popularmoviesapp.MovieDetailActivity;
+import net.konyan.popularmoviesapp.DetailActivity;
 import net.konyan.popularmoviesapp.R;
 import net.konyan.popularmoviesapp.adapter.MoviesAdapter;
-import net.konyan.popularmoviesapp.data.ParcelMoviesResult;
+import net.konyan.popularmoviesapp.data.MovieColumn;
+import net.konyan.popularmoviesapp.data.MovieProvider;
+import net.konyan.popularmoviesapp.data_model.Movie;
+import net.konyan.popularmoviesapp.utils.Util;
 import net.konyan.popularmoviesapp.utils.WebConfig;
 
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
-
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.net.HttpURLConnection;
 import java.util.ArrayList;
 import java.util.List;
 
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
 
 
-public class MainFragment extends Fragment {
+public class MainFragment extends Fragment implements LoaderManager.LoaderCallbacks<Cursor>{
 
     final String LOG_TAG = MainFragment.class.getSimpleName();
 
     private String currentOrder = WebConfig.PATH_POPULAR;
+
+    private static final int CURSOR_LOADER_ID = 0;
+
+    MovieClickCallback clickCallback;
 
     public MainFragment() {}
 
@@ -48,12 +59,31 @@ public class MainFragment extends Fragment {
     }
 
     @Override
+    public void onActivityCreated(@Nullable Bundle savedInstanceState) {
+        //Cursor c = getActivity().getContentResolver().query(MovieProvider.Movies.CONTENT_URI, null, null, null, null);
+        //Log.i(LOG_TAG, "cursor count: " + c.getCount());
+        //cursor loading fetch logic here!
+        getLoaderManager().initLoader(CURSOR_LOADER_ID, null, this);
+        super.onActivityCreated(savedInstanceState);
+    }
+
+    @Override
+    public void onAttach(Context context) {
+        super.onAttach(context);
+        if (context instanceof MovieClickCallback){
+            clickCallback = (MovieClickCallback) context;
+        }else {
+            throw new RuntimeException(context + " need to implement "+MovieClickCallback.class.getSimpleName());
+        }
+    }
+
+    @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setHasOptionsMenu(true);
     }
 
-    List<ParcelMoviesResult> moviesResults = new ArrayList<>();
+    //List<ParcelMoviesResult> moviesResults = new ArrayList<>();
     MoviesAdapter moviesAdapter;
 
     ProgressBar progressBar;
@@ -63,18 +93,19 @@ public class MainFragment extends Fragment {
         View view = inflater.inflate(R.layout.fragment_main, container, false);
         progressBar = (ProgressBar) view.findViewById(R.id.progress_main_fragment);
 
-        moviesAdapter = new MoviesAdapter(getActivity(), moviesResults);
-
-        GridView gridView = (GridView)view.findViewById(R.id.grid_movie_posters);
-        gridView.setAdapter(moviesAdapter);
-        gridView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+        moviesAdapter = new MoviesAdapter(getActivity(), null, new MoviesAdapter.ItemClickListener() {
             @Override
-            public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-                Intent detailIntent = new Intent(getActivity(), MovieDetailActivity.class);
-                detailIntent.putExtra(Intent.EXTRA_SUBJECT, moviesResults.get(position));
+            public void onClick(Uri uri) {
+                Intent detailIntent = new Intent(getActivity(), DetailActivity.class);
+                detailIntent.setData(uri);
                 startActivity(detailIntent);
+                clickCallback.onClick(uri);
             }
         });
+
+        RecyclerView recyclerMovies = (RecyclerView) view.findViewById(R.id.rv_movie_posters);
+        recyclerMovies.setAdapter(moviesAdapter);
+        recyclerMovies.setLayoutManager(new GridLayoutManager(getActivity(), 2));
 
         return view;
     }
@@ -82,7 +113,14 @@ public class MainFragment extends Fragment {
     @Override
     public void onStart() {
         super.onStart();
-        new FetchPopularMovies().execute(currentOrder);
+        fetchAndUpdateMovies(currentOrder);
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        Log.d(LOG_TAG, "main frag on resume");
+        getLoaderManager().restartLoader(CURSOR_LOADER_ID, null, this);
     }
 
     @Override
@@ -93,128 +131,145 @@ public class MainFragment extends Fragment {
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         int id = item.getItemId();
-        progressBar.setVisibility(View.VISIBLE);
+
         switch (id){
             case R.id.action_popular:{
                 if (currentOrder.equalsIgnoreCase(WebConfig.PATH_TOP_RATED)){
-
-                    new FetchPopularMovies().execute(WebConfig.PATH_POPULAR);
                     currentOrder = WebConfig.PATH_POPULAR;
+                    selectionArgs[0] = currentOrder;
+                    selection = MovieColumn.USER_SORT + " LIKE ? ";
+                    fetchAndUpdateMovies(currentOrder);
                 }
-                return true;
+                break;
+                //return true;
             }
             case R.id.action_top_rated:{
                 if (currentOrder.equalsIgnoreCase(WebConfig.PATH_POPULAR)){
-                    new FetchPopularMovies().execute(WebConfig.PATH_TOP_RATED);
                     currentOrder = WebConfig.PATH_TOP_RATED;
+                    selectionArgs[0] = currentOrder;
+                    selection = MovieColumn.USER_SORT + " LIKE ? ";
+                    fetchAndUpdateMovies(currentOrder);
                 }
-                return true;
+                break;
+                //return true;
             }
+            case R.id.action_my_favorite:{
+                selectionArgs[0] = WebConfig.PATH_FAVORITE;
+                selection = MovieColumn.USER_FAVORITE + " LIKE ? ";
+                break;
+            }
+            default:break;
+
         }
+
+        getLoaderManager().restartLoader(CURSOR_LOADER_ID, null, this);
         return super.onOptionsItemSelected(item);
     }
 
-    public class FetchPopularMovies extends AsyncTask<String, Void, List<ParcelMoviesResult>>{
 
-        @Override
-        protected void onPreExecute() {
+    private void fetchAndUpdateMovies(final String sort){
 
-        }
-
-        @Override
-        protected List<ParcelMoviesResult> doInBackground(String... params) {
-            return fetchMovies(params[0]);
-        }
-
-        List<ParcelMoviesResult> fetchMovies(String sort){
-            String jsonStr = null;
-            HttpURLConnection connection = null;
-            BufferedReader reader = null;
-
-            try {
-                Log.d(LOG_TAG, "fetch_url: "+WebConfig.getMoviesUrl(sort).toString());
-
-                connection = (HttpURLConnection) WebConfig.getMoviesUrl(sort).openConnection();
-                connection.setRequestMethod("GET");
-                connection.connect();
-
-                InputStream inputStream = connection.getInputStream();
-                StringBuffer buffer = new StringBuffer();
-                if (inputStream == null){
-                    return null;
-                }
-                reader = new BufferedReader(new InputStreamReader(inputStream));
-                String line;
-                while ((line = reader.readLine()) != null){
-                    buffer.append(line + "\n");
-                }
-
-                if (buffer.length() == 0){
-                    return null;
-                }
-
-                jsonStr = buffer.toString();
-
-            } catch (IOException e) {
-                Log.e(LOG_TAG, "connection_error: ", e);
-            } finally {
-                if (connection != null){
-                    connection.disconnect();
-                }
-
-                if (reader != null){
-                    try {
-                        reader.close();
-                    } catch (IOException e) {
-                        Log.e(LOG_TAG, "closing_steam_error: ", e);
+        long lastUpdated = Util.getUpdateTime(getActivity(), sort);
+        long diff = System.currentTimeMillis() - lastUpdated;
+        if ( diff > (1000*60*3) ){ //3 min
+            progressBar.setVisibility(View.VISIBLE);
+            Call<Movie> call = WebConfig.getMovies(currentOrder);
+            call.enqueue(new Callback<Movie>() {
+                @Override
+                public void onResponse(Call<Movie> call, Response<Movie> response) {
+                    Log.d(LOG_TAG, "retro:"+ response.message());
+                    progressBar.setVisibility(View.GONE);
+                    if (response.isSuccessful()){
+                        insertData(response.body().movies, sort);
+                        Util.saveUpdateTime(getActivity(), sort);
                     }
                 }
-            }
 
-            //parse from json and return parcel list
-            try {
-                return parseJson(jsonStr);
-            } catch (JSONException e) {
-                Log.d(LOG_TAG, "json_error: ", e);
-            }
-            return null;
-        }
-
-        public List<ParcelMoviesResult> parseJson(String jsonStr) throws JSONException {
-            List<ParcelMoviesResult> moviesList = new ArrayList<>();
-
-            if (jsonStr != null){
-                JSONObject rootObj = new JSONObject(jsonStr);
-                JSONArray moviesArray = rootObj.getJSONArray(ParcelMoviesResult.RESULTS);
-
-                for (int i = 0; i<moviesArray.length(); i++){
-
-                    String poster_path = moviesArray.getJSONObject(i).getString(ParcelMoviesResult.POSTER_PATH);
-                    String original_title = moviesArray.getJSONObject(i).getString(ParcelMoviesResult.ORIGINAL_TITLE);
-                    String backdrop_path = moviesArray.getJSONObject(i).getString(ParcelMoviesResult.BACKDROP_PATH);
-                    String overview = moviesArray.getJSONObject(i).getString(ParcelMoviesResult.OVERVIEW);
-                    double vote_average = moviesArray.getJSONObject(i).getDouble(ParcelMoviesResult.VOTE_AVERAGE);
-                    String release_date = moviesArray.getJSONObject(i).getString(ParcelMoviesResult.RELEASE_DATE);
-
-                    ParcelMoviesResult result =
-                            new ParcelMoviesResult(poster_path, original_title,
-                                    backdrop_path, overview,
-                                    vote_average, release_date);
-                    moviesList.add(result);
+                @Override
+                public void onFailure(Call<Movie> call, Throwable t) {
+                    Log.d(LOG_TAG, "retro error:"+ t.toString());
+                    progressBar.setVisibility(View.GONE);
                 }
-            }
-
-            return moviesList;
+            });
+        }else {
+            Log.d(LOG_TAG, "updated in three");
         }
 
-        @Override
-        protected void onPostExecute(List<ParcelMoviesResult> parcelMoviesResults) {
-            progressBar.setVisibility(View.GONE);
-            if (parcelMoviesResults != null){
-                moviesResults.clear();
-                moviesResults.addAll(parcelMoviesResults);
-                moviesAdapter.notifyDataSetChanged();
+    }
+
+    /*try to find same movies to update but taking care for sort category*/
+    private void insertData(List<Movie.MovieModel> movieList, String sort){
+        ArrayList<ContentProviderOperation> batchOperations = new ArrayList<>(movieList.size());
+
+        for (Movie.MovieModel movie : movieList){
+
+            String mSelectionClause = MovieColumn.USER_SORT +" ='"+sort +"' AND "+MovieColumn.MOVIE_ID +  " ='"+ movie.id +"'";
+
+            ContentValues mUpdateValues = new ContentValues();
+            mUpdateValues.put(MovieColumn.ORIGINAL_TITLE, movie.original_title);
+            mUpdateValues.put(MovieColumn.POSTER_PATH, movie.poster_path);
+
+            mUpdateValues.put(MovieColumn.BACK_DROP_URL, movie.backdrop_path);
+            mUpdateValues.put(MovieColumn.PLOT, movie.overview);
+            mUpdateValues.put(MovieColumn.RATING, movie.vote_average);
+            mUpdateValues.put(MovieColumn.RELEASE_DATE, movie.release_date);
+
+            int mRowsUpdated = getContext().getContentResolver().update(
+                    MovieProvider.Movies.CONTENT_URI,
+                    mUpdateValues,
+                    mSelectionClause,
+                    null
+            );
+
+            if (mRowsUpdated < 1){
+                ContentProviderOperation.Builder builder = ContentProviderOperation.newInsert(MovieProvider.Movies.CONTENT_URI);
+                builder.withValue(MovieColumn.MOVIE_ID, movie.id);
+                builder.withValue(MovieColumn.ORIGINAL_TITLE, movie.original_title);
+                builder.withValue(MovieColumn.POSTER_PATH, movie.poster_path);
+                builder.withValue(MovieColumn.BACK_DROP_URL, movie.backdrop_path);
+                builder.withValue(MovieColumn.PLOT, movie.overview);
+                builder.withValue(MovieColumn.RATING, movie.vote_average);
+                builder.withValue(MovieColumn.RELEASE_DATE, movie.release_date);
+                builder.withValue(MovieColumn.USER_SORT, sort);
+                batchOperations.add(builder.build());
             }
+
         }
+
+        try{
+            getActivity().getContentResolver().applyBatch(MovieProvider.AUTHORITY, batchOperations);
+            getActivity().getContentResolver().notifyChange(MovieProvider.Movies.CONTENT_URI, null);
+        } catch(RemoteException | OperationApplicationException e){
+            Log.e(LOG_TAG, "Error applying batch insert", e);
+        }
+    }
+
+    String[] projection = {MovieColumn._ID,
+            MovieColumn.MOVIE_ID,
+            MovieColumn.ORIGINAL_TITLE,
+            MovieColumn.POSTER_PATH};
+    String selection = MovieColumn.USER_SORT + " LIKE ? ";
+    String[] selectionArgs = {currentOrder};
+    @Override
+    public Loader<Cursor> onCreateLoader(int id, Bundle args) {
+        return new CursorLoader(getActivity(), MovieProvider.Movies.CONTENT_URI,
+                projection,
+                selection,
+                selectionArgs,
+                null);
+    }
+
+    @Override
+    public void onLoadFinished(Loader<Cursor> loader, Cursor data) {
+        moviesAdapter.swapCursor(data);
+    }
+
+    @Override
+    public void onLoaderReset(Loader<Cursor> loader) {
+        moviesAdapter.swapCursor(null);
+    }
+
+    public interface MovieClickCallback{
+        void onClick(Uri id);
     }
 }
